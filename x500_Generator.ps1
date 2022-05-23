@@ -1,5 +1,10 @@
-﻿Import-Module ExchangeOnlineManagement
-#Connect-ExchangeOnline
+#######################################################################################
+# Script qui permet de generer les valeurs x500 dans un environnement Exchange Hybrid #
+# Contact me on GitHub if you need help : https://github.com/Privass/                 #
+#######################################################################################
+
+Import-Module ExchangeOnlineManagement
+Connect-ExchangeOnline
 
 # Définition des variables du script
 $logPath = "c:\temp\x500_generator.log"
