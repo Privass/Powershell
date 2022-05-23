@@ -1,12 +1,12 @@
 #######################################################################################
-# Script qui permet de generer les valeurs x500 dans un environnement Exchange Hybrid #
+# Script to generate x500 values in an Exchange Hybrid environment                    #
 # Contact me on GitHub if you need help : https://github.com/Privass/                 #
 #######################################################################################
 
 Import-Module ExchangeOnlineManagement
 Connect-ExchangeOnline
 
-# Définition des variables du script
+# Initialization of script variables
 $logPath = "c:\temp\x500_generator.log"
 Add-Content -Path $logPath -Encoding UTF8 -Value "UPN,mailNickname,LegacyExchangeDN,etat"
 $e = 0 # Initialisation du compteur d'erreur
@@ -18,18 +18,18 @@ $LegacyExchangeDN = ""
 $test = ""
 $etat = ""
 
-# Récupération des comptes utilisateurs actifs avec l'attribut sync et l'attribut LegacyExchangeDN défini.
+# Retrieve active user accounts with the sync attribute and the LegacyExchangeDN attribute set.
 $Users = Get-ADUser -LDAPFilter '(&(objectCategory=person)(extensionAttribute1=Sync)(objectClass=user)(!userAccountControl:1.2.840.113556.1.4.803:=2)(LegacyExchangeDN=*))' -Properties SamAccountName,UserPrincipalName,proxyAddresses,mailNickname | select SamAccountName,UserPrincipalName,proxyAddresses,mailNickname
 
 $TotalItems=$Users.Count
 $CurrentItem = 0
 $PercentComplete = 0
 
-#Pour chaque utilisateur
+# For each user
 foreach ($User in $Users)
 {
     # Barre de progression
-    Write-Progress -Activity "En cours " -Status "$PercentComplete% Complete:" -PercentComplete $PercentComplete
+    Write-Progress -Activity "In progress " -Status "$PercentComplete% Complete:" -PercentComplete $PercentComplete
     
     # Définition des variables de la boucle
     $i = 0
@@ -37,17 +37,17 @@ foreach ($User in $Users)
     $mailNickname = $User.mailNickname
     $SamAccountName = $User.SamAccountName
     
-    # Nettoyage des variables de la boucle
+    # Cleaning of the variables of the loop
     Clear-Variable LegacyExchangeDN
     Clear-Variable test
     Clear-Variable etat
 
-    $test = Get-Mailbox -Identity $UPN -ErrorAction SilentlyContinue # Test si la BAL est cloud
+    $test = Get-Mailbox -Identity $UPN -ErrorAction SilentlyContinue # Test if the BAL is cloudy
 
-    if ($test -eq $null) # Si la BAL n'est pas Cloud
+    if ($test -eq $null) # If the mailbox is not Cloud
     {
-        $LegacyExchangeDN = Get-MailUser -Identity $UPN -ErrorAction SilentlyContinue | select LegacyExchangeDN  # Récupération de la valeur LegacyExchangeDN avec l'UPN
-        if ($? -eq "false") { # Si la commande précédente ne fonctionne pas
+        $LegacyExchangeDN = Get-MailUser -Identity $UPN -ErrorAction SilentlyContinue | select LegacyExchangeDN  # Retrieving the LegacyExchangeDN value with the UPN
+        if ($? -eq "false") { # If the previous command does not work
             #Write-Host "Impossible de récupérer les informations du compte $UPN avec l'UPN"
             #Write-Host "Nouvel essai avec le mailNickname $mailNickname"
             $LegacyExchangeDN = Get-MailUser -Identity $mailNickname -ErrorAction SilentlyContinue | select LegacyExchangeDN # Récupération de la valeur LegacyExchangeDN avec le mailNickname
