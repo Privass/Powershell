@@ -6,48 +6,55 @@
 Import-Module ExchangeOnlineManagement
 Connect-ExchangeOnline
 
-# Initialization of script variables
+# Définition des variables du script
 $logPath = "c:\temp\x500_generator.log"
-Add-Content -Path $logPath -Encoding UTF8 -Value "UPN,mailNickname,LegacyExchangeDN,etat"
 $e = 0 # Initialisation du compteur d'erreur
 $m = 0 # Initialisation du compteur d'utilisateur modifié
 $a = 0 # Initialisation du compteur de x500 deja existant
 $c = 0 # Initialisation du compteur de BAL Cloud
-$StartTime = (Get-Date).Millisecond
+$StartTime = Get-Date
 $LegacyExchangeDN = ""
 $test = ""
 $etat = ""
 
-# Retrieve active user accounts with the sync attribute and the LegacyExchangeDN attribute set.
+if (Test-Path $logPath) # Vérification de la présence du fichier de log
+{
+    Remove-Item $logPath # Si il existe alors de je le supprime
+}
+
+# Initialisation du fichier de log
+Add-Content -Path $logPath -Encoding UTF8 -Value "UPN,mailNickname,LegacyExchangeDN,etat"
+
+# Récupération des comptes utilisateurs actifs avec l'attribut sync et l'attribut LegacyExchangeDN défini.
 $Users = Get-ADUser -LDAPFilter '(&(objectCategory=person)(extensionAttribute1=Sync)(objectClass=user)(!userAccountControl:1.2.840.113556.1.4.803:=2)(LegacyExchangeDN=*))' -Properties SamAccountName,UserPrincipalName,proxyAddresses,mailNickname | select SamAccountName,UserPrincipalName,proxyAddresses,mailNickname
 
 $TotalItems=$Users.Count
 $CurrentItem = 0
 $PercentComplete = 0
 
-# For each user
+#Pour chaque utilisateur
 foreach ($User in $Users)
 {
-    # Barre de progression
-    Write-Progress -Activity "In progress " -Status "$PercentComplete% Complete:" -PercentComplete $PercentComplete
-    
     # Définition des variables de la boucle
     $i = 0
     $UPN = $User.UserPrincipalName
     $mailNickname = $User.mailNickname
     $SamAccountName = $User.SamAccountName
-    
-    # Cleaning of the variables of the loop
+
+    # Barre de progression
+    Write-Progress -Activity "En cours " -Status "$PercentComplete% Complete: $UPN" -PercentComplete $PercentComplete
+        
+    # Nettoyage des variables de la boucle
     Clear-Variable LegacyExchangeDN
     Clear-Variable test
     Clear-Variable etat
 
-    $test = Get-Mailbox -Identity $UPN -ErrorAction SilentlyContinue # Test if the BAL is cloudy
+    $test = Get-Mailbox -Identity $UPN -ErrorAction SilentlyContinue # Test si la BAL est cloud
 
-    if ($test -eq $null) # If the mailbox is not Cloud
+    if ($test -eq $null) # Si la BAL n'est pas Cloud
     {
-        $LegacyExchangeDN = Get-MailUser -Identity $UPN -ErrorAction SilentlyContinue | select LegacyExchangeDN  # Retrieving the LegacyExchangeDN value with the UPN
-        if ($? -eq "false") { # If the previous command does not work
+        $LegacyExchangeDN = Get-MailUser -Identity $UPN -ErrorAction SilentlyContinue | select LegacyExchangeDN  # Récupération de la valeur LegacyExchangeDN avec l'UPN
+        if ($? -eq "false") { # Si la commande précédente ne fonctionne pas
             #Write-Host "Impossible de récupérer les informations du compte $UPN avec l'UPN"
             #Write-Host "Nouvel essai avec le mailNickname $mailNickname"
             $LegacyExchangeDN = Get-MailUser -Identity $mailNickname -ErrorAction SilentlyContinue | select LegacyExchangeDN # Récupération de la valeur LegacyExchangeDN avec le mailNickname
@@ -68,14 +75,8 @@ foreach ($User in $Users)
             if ($i -eq 0) # Si l'utilisateur ne posséde pas le x500
             {
                 $m++ # Ajout de 1 au compteur des modifications
-                #Set-ADUser $SamAccountName -add @{ProxyAddresses=$LegacyExchangeDN} -ErrorAction SilentlyContinue
-                #if ($? -eq "false")
-                #{
-                #    Write-Host "Erreur lors de l'ajout du x500 pour $UPN" -BackgroundColor Red
-                #    $etat = "Erreur1"
-                #} else {
-                #    $etat = "Ajout"
-                #}
+                Set-ADUser $SamAccountName -add @{ProxyAddresses=$LegacyExchangeDN} -ErrorAction SilentlyContinue
+                $etat = "Ajout"
                 #Write-Host " "
                 #Write-Host "Ajout du x500 pour $UPN" -BackgroundColor Green
                 #Write-Host " "
@@ -108,11 +109,16 @@ foreach ($User in $Users)
 
 }
 
-$EndTime = (Get-Date).Millisecond
+$EndTime = Get-Date
 
 Write-Host "############################## FIN ############################"
 Write-Host " "
 Write-Host "$($Users.Count) Utilisateurs scannés / $m Utilisateurs modifiés / $c BAL Cloud / $a avaient déja un x500 / $e Erreurs"
-Write-Host "Ce script a pris $($StartTime - $EndTime) Miliseconds à s'executer."
+if ($($EndTime - $StartTime).Minutes -cge 1)
+{
+    Write-Host "Ce script a pris $($($StartTime).Minute - $($EndTime).Minute) Minutes à s'executer."
+} else {
+    Write-Host "Ce script a pris $($($StartTime).Miliseconds - $($EndTime).Miliseconds) Miliseconds à s'executer."
+}
 Write-Host " "
 Write-Host "###############################################################"
